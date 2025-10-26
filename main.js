@@ -1,14 +1,13 @@
-// =====================
+// ==================================
 // إعدادات عامة
-// =====================
+// ==================================
 
-const DPI = 150; // دقة مناسبة للبوستر الجداري - خفيفة على الطابعة ومقبولة من بعيد
+const DPI = 150; // دقة الطباعة المقترَحة للملصق الجداري
 
 const imageInput = document.getElementById("imageInput");
 const colsInput = document.getElementById("colsInput");
 const rowsInput = document.getElementById("rowsInput");
 const marginInput = document.getElementById("marginInput");
-const labelMode = document.getElementById("labelMode");
 const orientationSelect = document.getElementById("orientation");
 const generateBtn = document.getElementById("generateBtn");
 const previewCanvas = document.getElementById("previewCanvas");
@@ -22,13 +21,13 @@ let imgNaturalW = 0;
 let imgNaturalH = 0;
 
 
-// =====================
-// دوال مساعدة
-// =====================
+// ==================================
+// أدوات مساعدة
+// ==================================
 
 const mmToPx = (mm) => (mm / 25.4) * DPI;
 
-// مقاس A4 بالنسبة للدقة المختارة ودوران الورقة
+// يرجع أبعاد A4 حسب الاتجاه الحالي كبيكسل (للرسم) وملّيمتر (لـPDF)
 function getA4SizePx(orientation) {
   if (orientation === "landscape") {
     return {
@@ -48,9 +47,9 @@ function getA4SizePx(orientation) {
 }
 
 
-// =====================
-// معاينة الشبكة
-// =====================
+// ==================================
+// معاينة التقسيم
+// ==================================
 
 function redrawPreview() {
   if (!loadedImage) {
@@ -67,7 +66,7 @@ function redrawPreview() {
   const cols = parseInt(colsInput.value,10) || 1;
   const rows = parseInt(rowsInput.value,10) || 1;
 
-  // تصغير للعرض فقط
+  // تصغير الصورة للعرض فقط
   const maxPreviewW = 600;
   const scale = imgNaturalW > maxPreviewW ? (maxPreviewW / imgNaturalW) : 1;
 
@@ -82,7 +81,7 @@ function redrawPreview() {
 
   ctx.drawImage(loadedImage, 0, 0, dispW, dispH);
 
-  // رسم مربعات التقسيم
+  // رسم شبكة (تقريب لصفحات A4)
   const cellW = dispW / cols;
   const cellH = dispH / rows;
 
@@ -91,7 +90,7 @@ function redrawPreview() {
 
   // خطوط الأعمدة
   for (let c=1; c<cols; c++) {
-    const x = c*cellW;
+    const x = c * cellW;
     ctx.beginPath();
     ctx.moveTo(x,0);
     ctx.lineTo(x,dispH);
@@ -100,16 +99,16 @@ function redrawPreview() {
 
   // خطوط الصفوف
   for (let r=1; r<rows; r++) {
-    const y = r*cellH;
+    const y = r * cellH;
     ctx.beginPath();
     ctx.moveTo(0,y);
     ctx.lineTo(dispW,y);
     ctx.stroke();
   }
 
-  // معلومات الحجم
+  // معلومات الحجم النهائي على الحائط
   const {wCm,hCm} = getPosterPhysicalSizeCm();
-  const totalPages = rows*cols;
+  const totalPages = rows * cols;
   infoBox.textContent =
 `عدد الصفحات: ${totalPages} ورقة A4
 الحجم النهائي التقريبي على الحائط:
@@ -117,15 +116,15 @@ function redrawPreview() {
 }
 
 
-// يحسب الحجم النهائي للبوستر بالسنتيمتر (بعد جمع كل الأوراق)
+// يحسب أبعاد البوستر النهائي بالسنتيمتر بعد التجميع
 function getPosterPhysicalSizeCm() {
   const cols = parseInt(colsInput.value,10) || 1;
   const rows = parseInt(rowsInput.value,10) || 1;
   const { wMm, hMm } = getA4SizePx(orientationSelect.value);
 
   const marginMm = parseFloat(marginInput.value) || 0;
-  const usefulWmm = wMm - (marginMm*2);
-  const usefulHmm = hMm - (marginMm*2);
+  const usefulWmm = wMm - (marginMm * 2);
+  const usefulHmm = hMm - (marginMm * 2);
 
   return {
     wCm: (usefulWmm * cols) / 10,
@@ -134,13 +133,12 @@ function getPosterPhysicalSizeCm() {
 }
 
 
-// =====================
-// الاقتراحات الذكية (شبكات جاهزة)
-// =====================
+// ==================================
+// الاقتراحات الذكية (layout جاهز)
+// ==================================
 
 function buildSuggestions() {
   if (!loadedImage) {
-    // لو ما في صورة، اعرض نص فقط
     if (suggestionsList) {
       suggestionsList.innerHTML =
         `<div class="placeholderText">حمِّل صورة لرؤية الاقتراحات 👇</div>`;
@@ -161,22 +159,21 @@ function buildSuggestions() {
   const marginMmVal = parseFloat(marginInput.value) || 0;
   const marginPxVal = mmToPx(marginMmVal);
 
-  // المساحة الفعلية للرسم داخل كل صفحة بعد خصم الهامش
-  const usefulWpx = pageWpx - marginPxVal*2;
-  const usefulHpx = pageHpx - marginPxVal*2;
-  const usefulWmm = wMm - marginMmVal*2;
-  const usefulHmm = hMm - marginMmVal*2;
+  // المساحة المفيدة داخل الورقة بعد الهامش
+  const usefulWpx = pageWpx - marginPxVal * 2;
+  const usefulHpx = pageHpx - marginPxVal * 2;
+  const usefulWmm = wMm - marginMmVal * 2;
+  const usefulHmm = hMm - marginMmVal * 2;
 
   const opts = [];
 
-  // جرّب أحجام شبكات من 2 إلى 8
+  // نجرّب شبكات من 2x2 حتى 8x8 ونقيّم الجودة
   for (let rows=2; rows<=8; rows++) {
     for (let cols=2; cols<=8; cols++) {
-
       const finalWpx = usefulWpx * cols;
       const finalHpx = usefulHpx * rows;
 
-      // كم لازم نكبر الصورة الأصلية؟
+      // حجم التكبير المطلوب
       const scaleX = finalWpx / imgNaturalW;
       const scaleY = finalHpx / imgNaturalH;
       const scaleNeeded = Math.max(scaleX, scaleY); // أكبر تكبير
@@ -191,14 +188,14 @@ function buildSuggestions() {
         qualityText = "دقة جيدة";
       } else {
         qualityClass = "bad";
-        qualityText = "قد تكون الصورة مشوَّهة";
+        qualityText = "قد تصبح مشوشة";
       }
 
-      // الحجم المتوقع على الحائط بالسنتيمتر
+      // الأبعاد التقريبية على الحائط
       const posterWcm = (usefulWmm * cols) / 10;
       const posterHcm = (usefulHmm * rows) / 10;
 
-      // فلتر: لا نقترح شكل ممدود وغريب جداً مقارنة بنسبة الصورة
+      // لا نقترح شكل غريب جداً مقارنة بنسبة الصورة
       const aspectPoster = posterWcm / posterHcm;
       const aspectImg = imgNaturalW / imgNaturalH;
       const aspectRatioDiff = Math.max(aspectPoster/aspectImg, aspectImg/aspectPoster);
@@ -218,7 +215,7 @@ function buildSuggestions() {
     }
   }
 
-  // ترتيب الاقتراحات: أقل أوراق أولاً، ثم جودة أفضل
+  // نرتب الاقتراحات: الأقل أوراق أولاً، ثم جودة أفضل
   opts.sort((a,b)=>{
     if (a.pages !== b.pages) return a.pages - b.pages;
     const rank = q => q.qualityClass === "good" ? 0 : q.qualityClass === "ok" ? 1 : 2;
@@ -251,7 +248,7 @@ function buildSuggestions() {
       </div>
     `;
 
-    // عند الضغط على الاقتراح: نعكس القيم في الحقول
+    // عند الضغط على الاقتراح، نحدّث الحقول ونرسم من جديد
     card.addEventListener("click", ()=>{
       colsInput.value = opt.cols;
       rowsInput.value = opt.rows;
@@ -263,9 +260,9 @@ function buildSuggestions() {
 }
 
 
-// =====================
+// ==================================
 // تحميل الصورة من المستخدم
-// =====================
+// ==================================
 
 imageInput.addEventListener("change", (e) => {
   const file = e.target.files && e.target.files[0];
@@ -278,7 +275,6 @@ imageInput.addEventListener("change", (e) => {
     imgNaturalW = img.naturalWidth;
     imgNaturalH = img.naturalHeight;
 
-    // فعّل الأزرار
     generateBtn.disabled = false;
     if (refreshSuggestionsBtn) {
       refreshSuggestionsBtn.disabled = false;
@@ -296,7 +292,7 @@ if (refreshSuggestionsBtn) {
   });
 }
 
-// أي تغيير إعداد أساسي يعيد الرسم والاقتراحات
+// أي تغيير في الإعدادات يعيد المعاينة والاقتراحات
 [colsInput, rowsInput, marginInput, orientationSelect].forEach(el=>{
   el.addEventListener("input", ()=>{
     redrawPreview();
@@ -305,9 +301,9 @@ if (refreshSuggestionsBtn) {
 });
 
 
-// =====================
-// توليد ملف PDF المقسّم
-// =====================
+// ==================================
+// توليد PDF المقسّم (بدون نص على الصفحات، فقط الإطار)
+// ==================================
 
 generateBtn.addEventListener("click", () => {
   if (!loadedImage) return;
@@ -315,46 +311,41 @@ generateBtn.addEventListener("click", () => {
   const cols = parseInt(colsInput.value,10) || 1;
   const rows = parseInt(rowsInput.value,10) || 1;
   const marginMm = parseFloat(marginInput.value) || 0;
-  const showLabel = (labelMode.value === "on");
   const orientation = orientationSelect.value;
 
-  // 1. تأكد أن jsPDF موجود
-  // بعض المتصفحات / بعض نسخ jsPDF تحتاج النداء بهذه الطريقة:
-  //   const pdf = new window.jspdf.jsPDF(...)
-  // فنحددها بأمان:
+  // --- خطوة 1: نضمن jsPDF موجود ---
   const jsPDFConstructor =
     (window.jspdf && window.jspdf.jsPDF)
       ? window.jspdf.jsPDF
       : (typeof jsPDF !== "undefined" ? jsPDF : null);
 
   if (!jsPDFConstructor) {
-    alert("jsPDF غير محمّل. تأكد من وجود libs/jspdf.umd.min.js قبل main.js");
+    alert("jsPDF غير محمّل. تأكد من وجود libs/jspdf.umd.min.js في المشروع.");
     return;
   }
 
-  // 2. احسب أبعاد الورقة
+  // --- خطوة 2: حساب أبعاد الورقة ---
   const { wPx:pageWpx, hPx:pageHpx, wMm:pageWmm, hMm:pageHmm } = getA4SizePx(orientation);
 
   const marginPx = mmToPx(marginMm);
 
-  const usefulWpx = pageWpx - marginPx*2;
-  const usefulHpx = pageHpx - marginPx*2;
+  const usefulWpx = pageWpx - marginPx * 2;
+  const usefulHpx = pageHpx - marginPx * 2;
 
+  // حجم البوستر النهائي بعد التجميع
   const finalWpx = usefulWpx * cols;
   const finalHpx = usefulHpx * rows;
 
-  // 3. أنشئ كانفاس نهائي بالحجم الكامل للبوستر
+  // --- خطوة 3: نصنع Canvas نهائي بالحجم الكامل ---
   const finalCanvas = document.createElement("canvas");
   finalCanvas.width = finalWpx;
   finalCanvas.height = finalHpx;
 
   const fctx = finalCanvas.getContext("2d");
   fctx.imageSmoothingQuality = "high";
-
-  // كبّر الصورة الأصلية لتملأ الحجم النهائي
   fctx.drawImage(loadedImage, 0, 0, finalWpx, finalHpx);
 
-  // 4. أداة لقص جزء محدد من الكانفاس النهائي
+  // --- خطوة 4: دالة قص جزء واحد (خانة/تايل) ---
   function getTileDataURL(colIndex, rowIndex) {
     const sx = colIndex * usefulWpx;
     const sy = rowIndex * usefulHpx;
@@ -370,19 +361,17 @@ generateBtn.addEventListener("click", () => {
     return tileCanvas.toDataURL("image/jpeg", 0.95);
   }
 
-  // 5. جهّز الـPDF
+  // --- خطوة 5: جهز ملف الـPDF ---
   const pdf = new jsPDFConstructor({
     orientation: (orientation === "landscape") ? "landscape" : "portrait",
     unit: "mm",
     format: "a4",
   });
 
-  // رسم الإطار + التسمية على الصفحة
-  function drawGuides(currentRow, currentCol, cols, rows) {
-    // مستطيل القص
+  // نرسم فقط إطار القص (بدون أي نص عربي أو لاتيني)
+  function drawGuidesBoxOnly() {
     pdf.setDrawColor(150);
     pdf.setLineWidth(0.1);
-
     pdf.rect(
       marginMm,
       marginMm,
@@ -390,61 +379,20 @@ generateBtn.addEventListener("click", () => {
       pageHmm - marginMm*2
     );
     pdf.stroke();
-
-    if (!showLabel) return;
-
-    // اسم الجزء
-    pdf.setFontSize(10);
-    pdf.setTextColor(0,0,0);
-
-    const rowLetter = String.fromCharCode("A".charCodeAt(0) + currentRow);
-    const labelText = rowLetter + (currentCol+1);
-
-    pdf.text(
-      `جزء ${labelText} (صف ${currentRow+1} / عمود ${currentCol+1})`,
-      marginMm + 2,
-      marginMm + 5
-    );
-
-    // نص الإرشاد للجمع
-    let hint = "";
-    if (currentCol > 0) {
-      hint += "الصق يسار " + rowLetter + currentCol + "  ";
-    }
-    if (currentCol < cols-1) {
-      hint += "الصق يمين " + rowLetter + (currentCol+2) + "  ";
-    }
-    if (currentRow > 0) {
-      hint += "الصق أعلى " + String.fromCharCode("A".charCodeAt(0)+currentRow-1) + (currentCol+1) + "  ";
-    }
-    if (currentRow < rows-1) {
-      hint += "الصق أسفل " + String.fromCharCode("A".charCodeAt(0)+currentRow+1) + (currentCol+1);
-    }
-
-    if (hint.trim().length>0){
-      pdf.setFontSize(8);
-      pdf.text(
-        hint.trim(),
-        marginMm + 2,
-        marginMm + 10,
-        {maxWidth: pageWmm - marginMm*2 - 4}
-      );
-    }
   }
 
-  // 6. املأ صفحات الـPDF، صفحة لكل قطعة
+  // --- خطوة 6: إضافة كل جزء على صفحة خاصة ---
   for (let r=0; r<rows; r++) {
     for (let c=0; c<cols; c++) {
 
-      // الصفحات الجديدة بعد الأولى
+      // الصفحة الأولى موجودة تلقائياً. بعد ذلك نضيف صفحات جديدة.
       if (!(r===0 && c===0)) {
         pdf.addPage();
       }
 
-      // صورة الجزء الحالي
       const dataURL = getTileDataURL(c, r);
 
-      // ضع الصورة في المساحة المفيدة ضمن الصفحة
+      // ضع صورة الجزء داخل المساحة (بدون حواف الطابعة)
       pdf.addImage(
         dataURL,
         "JPEG",
@@ -454,11 +402,11 @@ generateBtn.addEventListener("click", () => {
         pageHmm - marginMm*2
       );
 
-      // أضف الإطار والشرح
-      drawGuides(r, c, cols, rows);
+      // أضف الإطار فقط
+      drawGuidesBoxOnly();
     }
   }
 
-  // 7. احفظ الملف
+  // --- خطوة 7: حفظ الملف ---
   pdf.save("poster.pdf");
 });
