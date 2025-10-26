@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>صانع اللوحة الجدارية (Split Poster)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header class="topbar">
+    <h1>صانع ملصق الحائط الكبير</h1>
+    <p class="subtitle">قسّم صورة واحدة إلى عدّة أوراق A4 وصدّرها PDF للطباعة ✂🧩</p>
+  </header>
+
+  <main class="layout">
+
+    <!-- لوحة الإعداد -->
+    <section class="card settings">
+      <h2>الإعداد</h2>
+
+      <label class="block">
+        <span>١. اختر الصورة</span>
+        <input type="file" id="imageInput" accept="image/*" />
+      </label>
+
+      <div class="grid2">
+        <label class="block">
+          <span>عدد الأعمدة (أوراق بالعرض)</span>
+          <input type="number" id="colsInput" min="1" value="3" />
+        </label>
+
+        <label class="block">
+          <span>عدد الصفوف (أوراق بالطول)</span>
+          <input type="number" id="rowsInput" min="1" value="2" />
+        </label>
+      </div>
+
+      <div class="grid2">
+        <label class="block">
+          <span>إضافة هامش للطابعة (مم)</span>
+          <input type="number" id="marginInput" min="0" value="5" />
+        </label>
+
+        <label class="block">
+          <span>كتابة رمز القطعة (A1, A2...)</span>
+          <select id="labelMode">
+            <option value="on" selected>نعم</option>
+            <option value="off">لا</option>
+          </select>
+        </label>
+      </div>
+
+      <label class="block">
+        <span>اتجاه الورق</span>
+        <select id="orientation">
+          <option value="portrait" selected>عمودي (A4 210×297مم)</option>
+          <option value="landscape">أفقي (A4 297×210مم)</option>
+        </select>
+      </label>
+
+      <button id="generateBtn" class="primary-btn" disabled>
+        توليد ملف PDF جاهز للطباعة
+      </button>
+
+      <p class="hint">
+        بعد الضغط، ستحصل على ملف PDF متعدد الصفحات. كل صفحة = جزء من الصورة.
+      </p>
+    </section>
+
+    <!-- المعاينة -->
+    <section class="card preview">
+      <h2>معاينة التقسيم</h2>
+      <canvas id="previewCanvas"></canvas>
+      <p class="hint small">
+        الخطوط المربعة = كيف سيتم قص الصورة إلى أوراق A4. هذا فقط عرض تقريبي.
+      </p>
+      <div id="infoBox" class="infoBox"></div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <small>Split Poster • نسخة أوّلية تعليمية للصف</small>
+  </footer>
+
+  <!-- مكتبة PDF -->
+  <script src="libs/jspdf.umd.min.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
