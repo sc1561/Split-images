@@ -1,31 +1,8 @@
-// ملاحظات مهمة:
-// - نفترض طباعة 300 DPI تقريباً؟ هذا عالي. للبوستر الجداري يكفي 150 DPI.
-//   بنبدأ بـ 150 DPI عشان ما يصير PDF ضخم جداً.
-// - A4 (مم): 210 x 297 عمودي. نحولها بالبكسل = (mm / 25.4 inch/mm) * DPI.
+// =====================
+// إعدادات عامة
+// =====================
 
-const DPI = 150; // دقة الطباعة المقترحة
-
-const mmToPx = (mm) => (mm / 25.4) * DPI;
-
-// مقاسات A4 حسب الاتجاه
-function getA4SizePx(orientation) {
-  if (orientation === "landscape") {
-    return {
-      wPx: mmToPx(297),
-      hPx: mmToPx(210),
-      wMm: 297,
-      hMm: 210
-    };
-  } else {
-    // portrait
-    return {
-      wPx: mmToPx(210),
-      hPx: mmToPx(297),
-      wMm: 210,
-      hMm: 297
-    };
-  }
-}
+const DPI = 150; // دقة مناسبة للبوستر الجداري - خفيفة على الطابعة ومقبولة من بعيد
 
 const imageInput = document.getElementById("imageInput");
 const colsInput = document.getElementById("colsInput");
@@ -37,31 +14,47 @@ const generateBtn = document.getElementById("generateBtn");
 const previewCanvas = document.getElementById("previewCanvas");
 const infoBox = document.getElementById("infoBox");
 
-let loadedImage = null; // Image object
+const suggestionsList = document.getElementById("suggestionsList");
+const refreshSuggestionsBtn = document.getElementById("refreshSuggestionsBtn");
+
+let loadedImage = null;
 let imgNaturalW = 0;
 let imgNaturalH = 0;
 
-// تحميل الصورة
-imageInput.addEventListener("change", async (e) => {
-  const file = e.target.files && e.target.files[0];
-  if (!file) return;
 
-  const url = URL.createObjectURL(file);
-  const img = new Image();
-  img.onload = () => {
-    loadedImage = img;
-    imgNaturalW = img.naturalWidth;
-    imgNaturalH = img.naturalHeight;
+// =====================
+// دوال مساعدة
+// =====================
 
-    redrawPreview();
-    generateBtn.disabled = false;
-  };
-  img.src = url;
-});
+const mmToPx = (mm) => (mm / 25.4) * DPI;
 
-// ارسم المعاينة مع الشبكة
+// مقاس A4 بالنسبة للدقة المختارة ودوران الورقة
+function getA4SizePx(orientation) {
+  if (orientation === "landscape") {
+    return {
+      wPx: mmToPx(297),
+      hPx: mmToPx(210),
+      wMm: 297,
+      hMm: 210
+    };
+  } else {
+    return {
+      wPx: mmToPx(210),
+      hPx: mmToPx(297),
+      wMm: 210,
+      hMm: 297
+    };
+  }
+}
+
+
+// =====================
+// معاينة الشبكة
+// =====================
+
 function redrawPreview() {
   if (!loadedImage) {
+    // لا توجد صورة بعد
     previewCanvas.width = 400;
     previewCanvas.height = 300;
     const ctx = previewCanvas.getContext("2d");
@@ -74,7 +67,7 @@ function redrawPreview() {
   const cols = parseInt(colsInput.value,10) || 1;
   const rows = parseInt(rowsInput.value,10) || 1;
 
-  // نخلي المعاينة تحتوي الصورة الأصلية بنسبة مصغرة
+  // تصغير للعرض فقط
   const maxPreviewW = 600;
   const scale = imgNaturalW > maxPreviewW ? (maxPreviewW / imgNaturalW) : 1;
 
@@ -89,13 +82,14 @@ function redrawPreview() {
 
   ctx.drawImage(loadedImage, 0, 0, dispW, dispH);
 
-  // ارسم الشبكة (كم سيتم تقطيع الصورة)
+  // رسم مربعات التقسيم
   const cellW = dispW / cols;
   const cellH = dispH / rows;
 
   ctx.strokeStyle = "rgba(255,0,0,0.6)";
   ctx.lineWidth = 1;
 
+  // خطوط الأعمدة
   for (let c=1; c<cols; c++) {
     const x = c*cellW;
     ctx.beginPath();
@@ -103,6 +97,8 @@ function redrawPreview() {
     ctx.lineTo(x,dispH);
     ctx.stroke();
   }
+
+  // خطوط الصفوف
   for (let r=1; r<rows; r++) {
     const y = r*cellH;
     ctx.beginPath();
@@ -111,40 +107,209 @@ function redrawPreview() {
     ctx.stroke();
   }
 
-  // معلومات أسفل المعاينة
-  const {wMm,hMm} = getPosterPhysicalSizeMm();
+  // معلومات الحجم
+  const {wCm,hCm} = getPosterPhysicalSizeCm();
   const totalPages = rows*cols;
   infoBox.textContent =
-    `عدد الصفحات: ${totalPages} ورقة A4
+`عدد الصفحات: ${totalPages} ورقة A4
 الحجم النهائي التقريبي على الحائط:
-≈ ${wMm.toFixed(1)} سم × ${hMm.toFixed(1)} سم`;
+≈ ${wCm.toFixed(1)} سم × ${hCm.toFixed(1)} سم`;
 }
 
-// احسب الأبعاد الفعلية للبوستر النهائي بالسنتيمتر
-function getPosterPhysicalSizeMm() {
+
+// يحسب الحجم النهائي للبوستر بالسنتيمتر (بعد جمع كل الأوراق)
+function getPosterPhysicalSizeCm() {
   const cols = parseInt(colsInput.value,10) || 1;
   const rows = parseInt(rowsInput.value,10) || 1;
   const { wMm, hMm } = getA4SizePx(orientationSelect.value);
 
-  // نطرح الهوامش؟ الفكرة: داخل الصفحة فيه هامش للطابعة.
-  // الهامش marginInput بالـ mm، فالعرض المفيد = عرض الصفحة - (هامش يمين + هامش يسار)
   const marginMm = parseFloat(marginInput.value) || 0;
   const usefulWmm = wMm - (marginMm*2);
   const usefulHmm = hMm - (marginMm*2);
 
   return {
-    wMm: (usefulWmm * cols) / 10, // سم
-    hMm: (usefulHmm * rows) / 10  // سم
+    wCm: (usefulWmm * cols) / 10,
+    hCm: (usefulHmm * rows) / 10
   };
 }
 
-// كل ما يغيّر المستخدم أي إعداد، نعيد المعاينة
-[colsInput, rowsInput, marginInput, orientationSelect].forEach(el=>{
-  el.addEventListener("input", redrawPreview);
+
+// =====================
+// الاقتراحات الذكية (شبكات جاهزة)
+// =====================
+
+function buildSuggestions() {
+  if (!loadedImage) {
+    // لو ما في صورة، اعرض نص فقط
+    if (suggestionsList) {
+      suggestionsList.innerHTML =
+        `<div class="placeholderText">حمِّل صورة لرؤية الاقتراحات 👇</div>`;
+    }
+    if (refreshSuggestionsBtn) {
+      refreshSuggestionsBtn.disabled = true;
+    }
+    return;
+  }
+
+  if (refreshSuggestionsBtn) {
+    refreshSuggestionsBtn.disabled = false;
+  }
+
+  const orientation = orientationSelect.value;
+  const { wPx:pageWpx, hPx:pageHpx, wMm, hMm } = getA4SizePx(orientation);
+
+  const marginMmVal = parseFloat(marginInput.value) || 0;
+  const marginPxVal = mmToPx(marginMmVal);
+
+  // المساحة الفعلية للرسم داخل كل صفحة بعد خصم الهامش
+  const usefulWpx = pageWpx - marginPxVal*2;
+  const usefulHpx = pageHpx - marginPxVal*2;
+  const usefulWmm = wMm - marginMmVal*2;
+  const usefulHmm = hMm - marginMmVal*2;
+
+  const opts = [];
+
+  // جرّب أحجام شبكات من 2 إلى 8
+  for (let rows=2; rows<=8; rows++) {
+    for (let cols=2; cols<=8; cols++) {
+
+      const finalWpx = usefulWpx * cols;
+      const finalHpx = usefulHpx * rows;
+
+      // كم لازم نكبر الصورة الأصلية؟
+      const scaleX = finalWpx / imgNaturalW;
+      const scaleY = finalHpx / imgNaturalH;
+      const scaleNeeded = Math.max(scaleX, scaleY); // أكبر تكبير
+
+      let qualityClass = "";
+      let qualityText = "";
+      if (scaleNeeded <= 1.1) {
+        qualityClass = "good";
+        qualityText = "دقة ممتازة";
+      } else if (scaleNeeded <= 2.0) {
+        qualityClass = "ok";
+        qualityText = "دقة جيدة";
+      } else {
+        qualityClass = "bad";
+        qualityText = "قد تكون الصورة مشوَّهة";
+      }
+
+      // الحجم المتوقع على الحائط بالسنتيمتر
+      const posterWcm = (usefulWmm * cols) / 10;
+      const posterHcm = (usefulHmm * rows) / 10;
+
+      // فلتر: لا نقترح شكل ممدود وغريب جداً مقارنة بنسبة الصورة
+      const aspectPoster = posterWcm / posterHcm;
+      const aspectImg = imgNaturalW / imgNaturalH;
+      const aspectRatioDiff = Math.max(aspectPoster/aspectImg, aspectImg/aspectPoster);
+      if (aspectRatioDiff > 2.5) {
+        continue;
+      }
+
+      opts.push({
+        rows,
+        cols,
+        pages: rows*cols,
+        posterWcm,
+        posterHcm,
+        qualityClass,
+        qualityText
+      });
+    }
+  }
+
+  // ترتيب الاقتراحات: أقل أوراق أولاً، ثم جودة أفضل
+  opts.sort((a,b)=>{
+    if (a.pages !== b.pages) return a.pages - b.pages;
+    const rank = q => q.qualityClass === "good" ? 0 : q.qualityClass === "ok" ? 1 : 2;
+    return rank(a) - rank(b);
+  });
+
+  const top = opts.slice(0,10);
+
+  if (!suggestionsList) return;
+
+  suggestionsList.innerHTML = "";
+
+  if (top.length === 0) {
+    suggestionsList.innerHTML =
+      `<div class="placeholderText">لم أجد اقتراحات مناسبة لهذه الصورة بهذا الإعداد.</div>`;
+    return;
+  }
+
+  top.forEach(opt => {
+    const card = document.createElement("div");
+    card.className = "suggestionCard";
+    card.innerHTML = `
+      <div class="suggestionLine1">
+        <span class="suggestionMainSize">${opt.cols} × ${opt.rows} أوراق</span>
+        <span>(${opt.pages} صفحة)</span>
+        <span class="suggestionQuality ${opt.qualityClass}">${opt.qualityText}</span>
+      </div>
+      <div class="suggestionLine2">
+        الحجم على الحائط ≈ ${opt.posterWcm.toFixed(1)}سم × ${opt.posterHcm.toFixed(1)}سم
+      </div>
+    `;
+
+    // عند الضغط على الاقتراح: نعكس القيم في الحقول
+    card.addEventListener("click", ()=>{
+      colsInput.value = opt.cols;
+      rowsInput.value = opt.rows;
+      redrawPreview();
+    });
+
+    suggestionsList.appendChild(card);
+  });
+}
+
+
+// =====================
+// تحميل الصورة من المستخدم
+// =====================
+
+imageInput.addEventListener("change", (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    loadedImage = img;
+    imgNaturalW = img.naturalWidth;
+    imgNaturalH = img.naturalHeight;
+
+    // فعّل الأزرار
+    generateBtn.disabled = false;
+    if (refreshSuggestionsBtn) {
+      refreshSuggestionsBtn.disabled = false;
+    }
+
+    redrawPreview();
+    buildSuggestions();
+  };
+  img.src = url;
 });
 
-// توليد الـ PDF
-generateBtn.addEventListener("click", async () => {
+if (refreshSuggestionsBtn) {
+  refreshSuggestionsBtn.addEventListener("click", ()=>{
+    buildSuggestions();
+  });
+}
+
+// أي تغيير إعداد أساسي يعيد الرسم والاقتراحات
+[colsInput, rowsInput, marginInput, orientationSelect].forEach(el=>{
+  el.addEventListener("input", ()=>{
+    redrawPreview();
+    buildSuggestions();
+  });
+});
+
+
+// =====================
+// توليد ملف PDF المقسّم
+// =====================
+
+generateBtn.addEventListener("click", () => {
   if (!loadedImage) return;
 
   const cols = parseInt(colsInput.value,10) || 1;
@@ -153,12 +318,23 @@ generateBtn.addEventListener("click", async () => {
   const showLabel = (labelMode.value === "on");
   const orientation = orientationSelect.value;
 
-  // مقاس صفحة A4 بالبكسل (على DPI اللي اخترناه)
+  // 1. تأكد أن jsPDF موجود
+  // بعض المتصفحات / بعض نسخ jsPDF تحتاج النداء بهذه الطريقة:
+  //   const pdf = new window.jspdf.jsPDF(...)
+  // فنحددها بأمان:
+  const jsPDFConstructor =
+    (window.jspdf && window.jspdf.jsPDF)
+      ? window.jspdf.jsPDF
+      : (typeof jsPDF !== "undefined" ? jsPDF : null);
+
+  if (!jsPDFConstructor) {
+    alert("jsPDF غير محمّل. تأكد من وجود libs/jspdf.umd.min.js قبل main.js");
+    return;
+  }
+
+  // 2. احسب أبعاد الورقة
   const { wPx:pageWpx, hPx:pageHpx, wMm:pageWmm, hMm:pageHmm } = getA4SizePx(orientation);
 
-  // سنبني كانفاس كبير في الذاكرة يمثل البوستر النهائي
-  // البوستر النهائي راح يكون بعرض = cols صفحات مفيدة
-  // لكن انتبه: داخل كل صفحة فيه هامش, فلازم نعرف المساحة المفيدة للرسم.
   const marginPx = mmToPx(marginMm);
 
   const usefulWpx = pageWpx - marginPx*2;
@@ -167,27 +343,19 @@ generateBtn.addEventListener("click", async () => {
   const finalWpx = usefulWpx * cols;
   const finalHpx = usefulHpx * rows;
 
-  // الآن نحتاج نكبر الصورة الأصلية لتملأ هذا الحجم النهائي
-  // ننشئ كانفاس "finalCanvas" بالحجم النهائي
+  // 3. أنشئ كانفاس نهائي بالحجم الكامل للبوستر
   const finalCanvas = document.createElement("canvas");
   finalCanvas.width = finalWpx;
   finalCanvas.height = finalHpx;
 
   const fctx = finalCanvas.getContext("2d");
   fctx.imageSmoothingQuality = "high";
+
+  // كبّر الصورة الأصلية لتملأ الحجم النهائي
   fctx.drawImage(loadedImage, 0, 0, finalWpx, finalHpx);
 
-  // نجهز jsPDF
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF({
-    orientation: (orientation === "landscape") ? "landscape" : "portrait",
-    unit: "mm",
-    format: "a4",
-  });
-
-  // helper: يحول canvas جزء صغير إلى dataURL
+  // 4. أداة لقص جزء محدد من الكانفاس النهائي
   function getTileDataURL(colIndex, rowIndex) {
-    // نقتطع من finalCanvas الجزء المناسب
     const sx = colIndex * usefulWpx;
     const sy = rowIndex * usefulHpx;
     const sw = usefulWpx;
@@ -202,69 +370,81 @@ generateBtn.addEventListener("click", async () => {
     return tileCanvas.toDataURL("image/jpeg", 0.95);
   }
 
-  // دالة لإضافة مربع النص (رمز القطعة) و علامات القص
-  function drawGuides() {
-    const ctx = pdf; // نسميه ctx للتسهيل لكن هو pdf
+  // 5. جهّز الـPDF
+  const pdf = new jsPDFConstructor({
+    orientation: (orientation === "landscape") ? "landscape" : "portrait",
+    unit: "mm",
+    format: "a4",
+  });
 
-    // إطار قص خفيف
-    ctx.setDrawColor(150);
-    ctx.setLineWidth(0.1);
+  // رسم الإطار + التسمية على الصفحة
+  function drawGuides(currentRow, currentCol, cols, rows) {
+    // مستطيل القص
+    pdf.setDrawColor(150);
+    pdf.setLineWidth(0.1);
 
-    // نرسم مستطيل حول المساحة المفيدة
-    ctx.rect(
+    pdf.rect(
       marginMm,
       marginMm,
       pageWmm - marginMm*2,
       pageHmm - marginMm*2
     );
-    ctx.stroke();
+    pdf.stroke();
 
-    // العلامة النصية
-    if (showLabel) {
-      ctx.setFontSize(10);
-      ctx.setTextColor(0,0,0);
+    if (!showLabel) return;
 
-      // اسم الصف بالحروف: A,B,C...
-      const rowLetter = String.fromCharCode("A".charCodeAt(0) + currentRow);
-      const labelText = rowLetter + (currentCol+1);
+    // اسم الجزء
+    pdf.setFontSize(10);
+    pdf.setTextColor(0,0,0);
 
-      ctx.text(
-        `جزء ${labelText} (صف ${currentRow+1} / عمود ${currentCol+1})`,
+    const rowLetter = String.fromCharCode("A".charCodeAt(0) + currentRow);
+    const labelText = rowLetter + (currentCol+1);
+
+    pdf.text(
+      `جزء ${labelText} (صف ${currentRow+1} / عمود ${currentCol+1})`,
+      marginMm + 2,
+      marginMm + 5
+    );
+
+    // نص الإرشاد للجمع
+    let hint = "";
+    if (currentCol > 0) {
+      hint += "الصق يسار " + rowLetter + currentCol + "  ";
+    }
+    if (currentCol < cols-1) {
+      hint += "الصق يمين " + rowLetter + (currentCol+2) + "  ";
+    }
+    if (currentRow > 0) {
+      hint += "الصق أعلى " + String.fromCharCode("A".charCodeAt(0)+currentRow-1) + (currentCol+1) + "  ";
+    }
+    if (currentRow < rows-1) {
+      hint += "الصق أسفل " + String.fromCharCode("A".charCodeAt(0)+currentRow+1) + (currentCol+1);
+    }
+
+    if (hint.trim().length>0){
+      pdf.setFontSize(8);
+      pdf.text(
+        hint.trim(),
         marginMm + 2,
-        marginMm + 5
+        marginMm + 10,
+        {maxWidth: pageWmm - marginMm*2 - 4}
       );
-
-      // إرشادات التجميع البسيطة:
-      // مثال: "ضعها يمين A1" ... بنعطي تلميح أفقي/رأسي
-      let hint = "";
-      if (currentCol > 0) hint += "الصق يسار جزء " + rowLetter + currentCol + "  ";
-      if (currentCol < cols-1) hint += "الصق يمين جزء " + rowLetter + (currentCol+2) + "  ";
-      if (currentRow > 0) hint += "الصق أعلى صف " + String.fromCharCode("A".charCodeAt(0)+currentRow-1) + (currentCol+1) + "  ";
-      if (currentRow < rows-1) hint += "الصق أسفل صف " + String.fromCharCode("A".charCodeAt(0)+currentRow+1) + (currentCol+1);
-
-      if (hint.trim().length>0){
-        ctx.setFontSize(8);
-        ctx.text(hint.trim(), marginMm + 2, marginMm + 10, {maxWidth: pageWmm - marginMm*2 - 4});
-      }
     }
   }
 
-  // حلقة توليد الصفحات
+  // 6. املأ صفحات الـPDF، صفحة لكل قطعة
   for (let r=0; r<rows; r++) {
     for (let c=0; c<cols; c++) {
 
-      const currentRow = r;
-      const currentCol = c;
-
-      // لو مش أول صفحة لا تنس تضيف صفحة جديدة
+      // الصفحات الجديدة بعد الأولى
       if (!(r===0 && c===0)) {
         pdf.addPage();
       }
 
-      // جيب صورة الجزء الحالي
+      // صورة الجزء الحالي
       const dataURL = getTileDataURL(c, r);
 
-      // أضف الصورة في الـ PDF داخل المساحة المفيدة
+      // ضع الصورة في المساحة المفيدة ضمن الصفحة
       pdf.addImage(
         dataURL,
         "JPEG",
@@ -274,11 +454,11 @@ generateBtn.addEventListener("click", async () => {
         pageHmm - marginMm*2
       );
 
-      // أضف الإرشادات/الإطار
-      drawGuides();
+      // أضف الإطار والشرح
+      drawGuides(r, c, cols, rows);
     }
   }
 
-  // حمّل الملف
+  // 7. احفظ الملف
   pdf.save("poster.pdf");
 });
